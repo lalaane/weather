@@ -10,9 +10,11 @@ let forecastBlock = document.querySelector('.weather__forecast');
 let suggestions = document.querySelector('#suggestions');
 
 let weatherAPIKey = config.API_KEY;
+
 let weatherBaseEndpoint = 'https://api.openweathermap.org/data/2.5/weather?units=metric&appid=' + weatherAPIKey;
 let forecastBaseEndpoint = 'https://api.openweathermap.org/data/2.5/forecast?units=metric&appid=' + weatherAPIKey;
 let cityBaseEndpoint = 'https://api.teleport.org/api/cities/?search=';
+let geocodingBaseEndpoint = 'http://api.openweathermap.org/geo/1.0/direct?&limit=5&appid=' + weatherAPIKey + '&q=';
 
 let weatherImages = [
 	{
@@ -87,10 +89,9 @@ const getForecastByCityID = async id => {
 	});
 	return daily;
 };
-
 const weatherForCity = async city => {
 	let weather = await getWeatherByCityName(city); // as the getweather... is a async function, we need to add await here to assign this variable
-	if (!weather) {
+	if (weather.cod == 404) {
 		return;
 	}
 	let cityID = weather.id;
@@ -99,30 +100,24 @@ const weatherForCity = async city => {
 	updateForecast(forecast);
 };
 
-let init = () => {
-	weatherForCity('Dubai').then(() => (document.body.style.filter = 'blur(0)'));
-};
-
-init();
-
 searchInput.addEventListener('keydown', async e => {
 	if (e.keyCode === 13) {
 		/* when enter is clicked do the search*/
 		weatherForCity(searchInput.value);
 	}
 });
-
 searchInput.addEventListener('input', async () => {
-	let endpoint = cityBaseEndpoint + searchInput.value;
+	if (searchInput.value.length <= 2) {
+		return;
+	}
+	let endpoint = geocodingBaseEndpoint + searchInput.value;
 	let result = await (await fetch(endpoint)).json();
 	suggestions.innerHTML = '';
-	let cities = result._embedded['city:search-results'];
-	let length = cities.length >= 5 ? 5 : cities.length;
-	for (let i = 0; i < length; i++) {
+	result.forEach(city => {
 		let option = document.createElement('option');
-		option.value = cities[i].matching_full_name;
+		option.value = `${city.name}${city.state ? ', ' + city.state : ''}, ${city.country}`;
 		suggestions.appendChild(option);
-	}
+	});
 });
 
 const updateCurrentWeather = data => {
@@ -136,7 +131,7 @@ const updateCurrentWeather = data => {
 		windDirection = 'East';
 	} else if (deg > 135 && deg <= 225) {
 		windDirection = 'South';
-	} else if ((deg > 225) & (deg <= 315)) {
+	} else if (deg > 225 && deg <= 315) {
 		windDirection = 'West';
 	} else {
 		windDirection = 'North';
@@ -172,3 +167,9 @@ const updateForecast = forecast => {
 const dayOfWeek = (dt = new Date().getTime()) => {
 	return new Date(dt).toLocaleDateString('en-EN', { weekday: 'long' });
 };
+
+let init = async () => {
+	await weatherForCity('Dubai');
+	document.body.style.filter = 'blur(0)';
+};
+init();
